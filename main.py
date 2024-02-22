@@ -2,12 +2,10 @@ from Bio import SeqIO
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from Levenshtein import distance
-from sklearn.neighbors import KNeighborsClassifier
-from calcolatePerformance import calcolateModel
-from sequenceAlignment import sequenceAlignment
+import matplotlib.pyplot as plt
 import numpy as np
+from methods import knn
+from methods import randomForest
 
 # Definiamo qualche categoria di proteine sulle quali lavorare
 """
@@ -45,7 +43,7 @@ df = pd.DataFrame(sequences)
 # PreProcessing
 
 # Creo un dataset ridotto perchè ho troppi dati
-sequences_reduced, _, y_reduced, _ = train_test_split(df['Sequence'], df['Function'], test_size=0.99)
+sequences_reduced, _, y_reduced, _ = train_test_split(df['Sequence'], df['Function'], test_size=0.9)
 dfReducedString = []
 for i in range(len(sequences_reduced)):
     dfReducedString.append({"Sequence": sequences_reduced.iat[i], "Function": y_reduced.iat[i]})
@@ -55,92 +53,31 @@ df = pd.DataFrame(dfReducedString)
 leSequence = LabelEncoder()
 df['SequenceTransform'] = leSequence.fit_transform(df['Sequence'])
 
+# Random Forest #
+statRF = randomForest(dataframe=df, classes=classes, flagplt=True)
+print(statRF)
 
-###### Random Forest #############################
-# Split the data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(df['SequenceTransform'], df['Function'], test_size=0.3)
-# per funzionare gli alberi hanno bisogno di array non series
-X_train = X_train.to_numpy()
-y_train = y_train.to_numpy()
-X_test = X_test.to_numpy()
-y_test = y_test.to_numpy()
-X_train = X_train.reshape(-1, 1)
-X_test = X_test.reshape(-1, 1)
-# Fit a model to the training data
-model = RandomForestClassifier()
-model.fit(X_train, y_train)
-# Make predictions on the testing data
-y_pred = model.predict(X_test)
-staticisRFC = calcolateModel(y_test, y_pred, classes)
-
-############################# KNN ############################################
+# KNN #
 # idea: proteine con sequenze simili hanno funzioni simili -> usiamo distanza di Levenshtein!
-X_train, X_test, y_train, y_test = train_test_split(df['Sequence'], df['Function'], test_size=0.3)
-# per funzionare gli alberi hanno bisogno di array non series
-X_train = X_train.to_numpy()
-y_train = y_train.to_numpy()
-X_test = X_test.to_numpy()
-y_test = y_test.to_numpy()
-X_train = X_train.reshape(-1, 1)
-# y_train = y_train.reshape(-1,1)
-X_test = X_test.reshape(-1, 1)
-distanceTrainTrain = np.zeros((X_train.size, X_train.size))
-for i in range(X_train.size):
-    for j in range(i, X_train.size):
-        xi = X_train[i]
-        xj = X_train[j]
-        xi = xi[0]
-        xj = xj[0]
-        distanceTrainTrain[i, j] = distance(xi, xj)
-        distanceTrainTrain[j, i] = distanceTrainTrain[i, j]
+# valutiamo il numero migliore di vicini da utilizzare
+nTest = 7
+accuracyVec = np.zeros((nTest, 1))
 
-distanceTestTrain = np.zeros((X_test.size, X_train.size))
-for i in range(X_test.size):
-    for j in range(X_train.size):
-        xi = X_test[i]
-        xj = X_train[j]
-        xi = xi[0]
-        xj = xj[0]
-        distanceTestTrain[i, j] = distance(xi, xj)
+for i in range(nTest):
+    k = i + 3
+    accuracy, other = knn(df, k, classes, False)
+    accuracyVec[i] = accuracy
 
-neigh = KNeighborsClassifier(n_neighbors=3, metric="precomputed")
-neigh.fit(distanceTrainTrain, y_train)
-y_predKNN = neigh.predict(distanceTestTrain)
+testSample = np.linspace(3, nTest+2, nTest)
+fig, ax = plt.subplots()  # Create a figure containing a single axes.
+ax.plot(testSample, accuracyVec)  # Plot some data on the axes.
+plt.show()
 
-staticisKNN = calcolateModel(y_test, y_predKNN, classes)
+k = 8
 
-################################# Proviamo KNN con Sequence Aligment
+accuracy, classes_stat = knn(df, k, classes, True)
+print(classes_stat)
 
-X_train, X_test, y_train, y_test = train_test_split(df['Sequence'], df['Function'], test_size=0.3)
-# per funzionare gli alberi hanno bisogno di array non series
-X_train = X_train.to_numpy()
-y_train = y_train.to_numpy()
-X_test = X_test.to_numpy()
-y_test = y_test.to_numpy()
-X_train = X_train.reshape(-1, 1)
-# y_train = y_train.reshape(-1,1)
-X_test = X_test.reshape(-1, 1)
-distanceTrainTrain = np.zeros((X_train.size, X_train.size))
-for i in range(X_train.size):
-    for j in range(i, X_train.size):
-        xi = X_train[i]
-        xj = X_train[j]
-        xi = xi[0]
-        xj = xj[0]
-        distanceTrainTrain[i, j] = sequenceAlignment(xi, xj)
-        distanceTrainTrain[j, i] = distanceTrainTrain[i, j]
+# Proviamo KNN con Sequence Aligment #
 
-distanceTestTrain = np.zeros((X_test.size, X_train.size))
-for i in range(X_test.size):
-    for j in range(X_train.size):
-        xi = X_test[i]
-        xj = X_train[j]
-        xi = xi[0]
-        xj = xj[0]
-        distanceTestTrain[i, j] = sequenceAlignment(xi, xj)
 
-neigh = KNeighborsClassifier(n_neighbors=3, metric="precomputed")
-neigh.fit(distanceTrainTrain, y_train)
-y_predKNN = neigh.predict(distanceTestTrain)
-
-staticisKNN = calcolateModel(y_test, y_predKNN, classes)
