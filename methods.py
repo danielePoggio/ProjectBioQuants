@@ -6,6 +6,16 @@ from sklearn.neighbors import KNeighborsClassifier
 from calcolatePerformance import calcolateModel
 from sequenceAlignment import sequenceAlignment
 import numpy as np
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+
+
+def statistics(y_test, y_pred):
+    accuracy = accuracy_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred, average='micro')
+    recall = recall_score(y_test, y_pred, average='micro')
+    return accuracy, precision, recall
 
 
 def randomForest(dataframe, classes, flagplt):
@@ -24,8 +34,9 @@ def randomForest(dataframe, classes, flagplt):
     model.fit(X_train, y_train)
     # Make predictions on the testing data
     y_pred = model.predict(X_test)
-    staticisRFC = calcolateModel(y_test, y_pred, classes, flagplt, strName='Random Forest')
-    return staticisRFC
+    # staticisRFC = calcolateModel(y_test, y_pred, classes, flagplt, strName='Random Forest')
+    statisticisRFC = statistics(y_test, y_pred)
+    return statisticisRFC
 
 
 def knn(dataframe, k, classes, flagplt):
@@ -65,7 +76,7 @@ def knn(dataframe, k, classes, flagplt):
     staticisKNN = calcolateModel(y_test, y_predKNN, classes, flagplt, strName='KNN with k = ' + str(k))
 
     cm = confusion_matrix(y_test, y_predKNN)
-    global_accuracy = np.sum(np.diag(cm))/np.sum(cm)
+    global_accuracy = np.sum(np.diag(cm)) / np.sum(cm)
     return global_accuracy, staticisKNN
 
 
